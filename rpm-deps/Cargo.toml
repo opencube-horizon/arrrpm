@@ -2,10 +2,12 @@
 name = "rpm-deps"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 argh = "0.1.12"
-petgraph = { version = "0.6.4", default-features = false, features = ["graphmap"] }
+petgraph = { version = "0.6.4", default-features = false }
+regex = "1.10.2"
 rpm = "0.13.1"
