@@ -2,7 +2,6 @@
 
 Simple standalone and portable binary to inspect given RPMs and generate a dependency tree in the DOT format.
 
-```
 ```console
 $ ./rpm-deps --help
 Usage: rpm-deps [<rpms...>] [-x <exclude...>]
@@ -20,5 +19,8 @@ Options:
 Example usage when using a terminal (`wezterm`) which can display images inline:
 
 ```console
-$ ./rpm-deps -x '^(grep|coreutils|suse-kernel-rpm-scriptlets|python-rpm-macros)$' -x '64kb$' ~/Downloads/some-archive/*.rpm | dot -Tjpg -Grankdir=LR | wezterm imgcat
+$ ./rpm-deps \
+  -x '^(grep|coreutils|suse-kernel-rpm-scriptlets|python-rpm-macros)$' \
+  -x '64kb$' \
+  ~/Downloads/some-archive/*.rpm | dot -Tjpg -Grankdir=LR | wezterm imgcat
 ```
