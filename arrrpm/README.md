@@ -42,5 +42,12 @@ Options:
 Example usage when using a terminal (`wezterm`) which can display images inline:
 
 ```console
-$ ./arrrpm dep-tree -x '^(grep|coreutils|suse-kernel-rpm-scriptlets|python-rpm-macros)$' -x '64kb$' ~/Downloads/some-archive/*.rpm | dot -Tjpg -Grankdir=LR | wezterm imgcat
+$ ./arrrpm dep-tree \
+  -x '^(grep|coreutils|suse-kernel-rpm-scriptlets|python-rpm-macros)$' \
+  ~/Downloads/some-archive/*.rpm | dot -Tjpg -Grankdir=LR | wezterm imgcat
 ```
+
+## Why Arrrpm?
+
+Pirates like to take packages which don't belong to them and with Arrrpm you can inspect RPMs on systems where there are usually no tools to do so, without resorting to `rpm2cpio`.
+And getting an overview on which packages belong together is important for a pirate either.
