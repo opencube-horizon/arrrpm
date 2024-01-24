@@ -4,6 +4,8 @@ use petgraph::graph::Graph;
 use petgraph::dot::{Dot, Config};
 use rpm::{PackageMetadata, FileMode};
 use regex::RegexSet;
+use indent::indent_all_by;
+use phf::phf_map;
 
 #[derive(FromArgs)]
 /// Some RPM tools
@@ -17,6 +19,8 @@ struct Arrrpm {
 enum ArrrpmSubcommands {
     DepTree(SubcommandDepTree),
     Ls(SubcommandLs),
+    Info(SubcommandInfo),
+    Cat(SubcommandCat),
 }
 
 #[derive(FromArgs)]
@@ -40,6 +44,35 @@ struct SubcommandLs {
     #[argh(positional)]
     rpm: String,
 }
+
+#[derive(FromArgs)]
+/// List info for the given RPM
+#[argh(subcommand, name = "info")]
+struct SubcommandInfo {
+    /// RPM
+    #[argh(positional)]
+    rpm: String,
+}
+
+#[derive(FromArgs)]
+/// Cat content from the RPM (mainly scriptlets)
+#[argh(subcommand, name = "cat")]
+struct SubcommandCat {
+    /// RPM
+    #[argh(positional)]
+    rpm: String,
+}
+
+static SCRIPTLET_METHODS: phf::Map<&'static str, fn(&PackageMetadata) -> Result<rpm::Scriptlet, rpm::Error>> = phf_map! {
+    "pre_install" => PackageMetadata::get_pre_install_script,
+    "post_install" => PackageMetadata::get_post_install_script,
+    "pre_uninstall" => PackageMetadata::get_pre_uninstall_script,
+    "post_uninstall" => PackageMetadata::get_post_uninstall_script,
+    "pre_trans" => PackageMetadata::get_pre_trans_script,
+    "post_trans" => PackageMetadata::get_post_trans_script,
+    "pre_untrans" => PackageMetadata::get_pre_untrans_script,
+    "post_untrans" => PackageMetadata::get_post_untrans_script,
+};
 
 fn main() {
     let arrrpm: Arrrpm = argh::from_env();
@@ -159,6 +192,53 @@ fn main() {
                     }
                     _ => todo!(),
                 }
+            }
+        },
+
+        ArrrpmSubcommands::Info(cmd) => {
+            let pkg = match PackageMetadata::open(&cmd.rpm) {
+                Ok(pkg) => pkg,
+                Err(error) => {
+                    panic!("Opening {:#?} failed: {:#?}", cmd.rpm, error);
+                }
+            };
+
+            println!("Name: {}", pkg.get_name().unwrap_or(""));
+            println!("Summary: {}", pkg.get_summary().unwrap_or(""));
+            println!("Version: {}", pkg.get_version().unwrap_or(""));
+            println!("Vendor: {}", pkg.get_vendor().unwrap_or(""));
+            println!("Packager: {}", pkg.get_packager().unwrap_or(""));
+
+            println!("Description: |\n{}", indent_all_by(2, pkg.get_description().unwrap_or("")));
+
+            let mut available_scriptlets: Vec<String> = vec![];
+            for (scriptlet_name, func) in &SCRIPTLET_METHODS {
+                match func(&pkg) {
+                    Ok(_) => {
+                        available_scriptlets.push(scriptlet_name.to_string());
+                        //println!("{}: |\n{}", scriptlet_name, indent_all_by(2, scriptlet.script));
+                    },
+                    Err(_) => {}
+                };
+            }
+            println!("Scriptlets: [{}]", available_scriptlets.join(", "));
+        }
+
+        ArrrpmSubcommands::Cat(cmd) => {
+            let pkg = match PackageMetadata::open(&cmd.rpm) {
+                Ok(pkg) => pkg,
+                Err(error) => {
+                    panic!("Opening {:#?} failed: {:#?}", cmd.rpm, error);
+                }
+            };
+
+            for (scriptlet_name, func) in &SCRIPTLET_METHODS {
+                match func(&pkg) {
+                    Ok(scriptlet) => {
+                        println!("{}: |\n{}", scriptlet_name, indent_all_by(2, scriptlet.script));
+                    },
+                    Err(_) => {}
+                };
             }
         }
     }
