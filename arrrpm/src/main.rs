@@ -2,7 +2,7 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use petgraph::graph::Graph;
 use petgraph::dot::{Dot, Config};
-use rpm::{PackageMetadata, FileMode};
+use rpm::{Package, PackageMetadata, FileMode};
 use regex::RegexSet;
 use indent::indent_all_by;
 use phf::phf_map;
@@ -61,6 +61,10 @@ struct SubcommandCat {
     /// RPM
     #[argh(positional)]
     rpm: String,
+
+    /// scriptlets to output (default: all, can be: {{pre,post}}_{{install,uninstall,trans,untrans}})
+    #[argh(option, short = 's')]
+    scriptlets: Vec<String>,
 }
 
 static SCRIPTLET_METHODS: phf::Map<&'static str, fn(&PackageMetadata) -> Result<rpm::Scriptlet, rpm::Error>> = phf_map! {
@@ -225,15 +229,15 @@ fn main() {
         }
 
         ArrrpmSubcommands::Cat(cmd) => {
-            let pkg = match PackageMetadata::open(&cmd.rpm) {
+            let pkg = match Package::open(&cmd.rpm) {
                 Ok(pkg) => pkg,
                 Err(error) => {
                     panic!("Opening {:#?} failed: {:#?}", cmd.rpm, error);
                 }
             };
 
-            for (scriptlet_name, func) in &SCRIPTLET_METHODS {
-                match func(&pkg) {
+            for (scriptlet_name, func) in SCRIPTLET_METHODS.into_iter().filter(|(key, _)| cmd.scriptlets.is_empty() || cmd.scriptlets.contains(&key.to_string())) {
+                match func(&pkg.metadata) {
                     Ok(scriptlet) => {
                         println!("{}: |\n{}", scriptlet_name, indent_all_by(2, scriptlet.script));
                     },
