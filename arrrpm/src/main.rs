@@ -132,7 +132,7 @@ fn main() {
                     Ok(recs) => recs,
                     Err(error) => {
                         eprintln!(
-                            "Reading requirements for {:#?} failed: {:#?}, ignoring...",
+                            "Reading recommends for {:#?} failed: {:#?}, ignoring...",
                             rpm, error
                         );
                         continue;
@@ -257,6 +257,28 @@ fn main() {
                 }
             }
             println!("Scriptlets: [{}]", available_scriptlets.join(", "));
+
+            println!("Requires:");
+            if let Ok(reqs) = pkg.get_requires()  {
+                for req in reqs {
+                    if !req.version.is_empty() {
+                        println!("  - {} {}", req.name, req.version)
+                    } else {
+                        println!("  - {}", req.name)
+                    }
+                }
+            }
+
+            println!("Recommends:");
+            if let Ok(recs) = pkg.get_recommends()  {
+                for rec in recs {
+                    if !rec.version.is_empty() {
+                        println!("  - {} ({})", rec.name, rec.version)
+                    } else {
+                        println!("  - {}", rec.name)
+                    }
+                }
+            }
         }
 
         ArrrpmSubcommands::Cat(cmd) => {
