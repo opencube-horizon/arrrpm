@@ -5,7 +5,8 @@ use petgraph::graph::Graph;
 use phf::phf_map;
 use regex::RegexSet;
 use rpm::{FileMode, Package, PackageMetadata};
-use std::collections::BTreeMap;
+use std::os::unix::fs::PermissionsExt;
+use std::{collections::BTreeMap, env, fs, io::Write, os::unix::fs::symlink, path::Path};
 
 #[derive(FromArgs)]
 /// Some RPM tools
@@ -21,6 +22,7 @@ enum ArrrpmSubcommands {
     Ls(SubcommandLs),
     Info(SubcommandInfo),
     Cat(SubcommandCat),
+    Extract(SubcommandExtract),
 }
 
 #[derive(FromArgs)]
@@ -65,6 +67,15 @@ struct SubcommandCat {
     /// scriptlets to output (default: all, can be: {{pre,post}}_{{install,uninstall,trans,untrans}})
     #[argh(option, short = 's')]
     scriptlets: Vec<String>,
+}
+
+#[derive(FromArgs)]
+/// Extract files from the RPM
+#[argh(subcommand, name = "extract")]
+struct SubcommandExtract {
+    /// RPM
+    #[argh(positional)]
+    rpm: String,
 }
 
 type ScriptletMethod = fn(&PackageMetadata) -> Result<rpm::Scriptlet, rpm::Error>;
@@ -263,7 +274,7 @@ fn main() {
             println!("Scriptlets: [{}]", available_scriptlets.join(", "));
 
             println!("Requires:");
-            if let Ok(reqs) = pkg.get_requires()  {
+            if let Ok(reqs) = pkg.get_requires() {
                 for req in reqs {
                     if !req.version.is_empty() {
                         println!("  - {} {}", req.name, req.version)
@@ -274,7 +285,7 @@ fn main() {
             }
 
             println!("Recommends:");
-            if let Ok(recs) = pkg.get_recommends()  {
+            if let Ok(recs) = pkg.get_recommends() {
                 for rec in recs {
                     if !rec.version.is_empty() {
                         println!("  - {} ({})", rec.name, rec.version)
@@ -302,6 +313,75 @@ fn main() {
                         scriptlet_name,
                         indent_all_by(2, scriptlet.script)
                     );
+                }
+            }
+        }
+        ArrrpmSubcommands::Extract(cmd) => {
+            let pkg = match Package::open(&cmd.rpm) {
+                Ok(pkg) => pkg,
+                Err(error) => {
+                    panic!("Opening {:#?} failed: {:#?}", cmd.rpm, error);
+                }
+            };
+
+            // Much of the below was lifted from the extract routine in the RPM crate,
+            // to be able to implement the --strip-components functionality
+
+            let dirs = match pkg
+                .metadata
+                .header
+                .get_entry_data_as_string_array(IndexTag::RPMTAG_DIRNAMES)
+            {
+                Ok(dirs) => dirs,
+                Err(error) => {
+                    panic!("Getting list of directories failed: {:#?}", error);
+                }
+            };
+
+            let dest = env::current_dir().unwrap();
+
+            // pull every base directory name in the package and create the directory in advance
+            for dir in dirs {
+                let dir_path = dest.join(Path::new(dir).strip_prefix("/").unwrap_or(dest.as_ref()));
+                fs::create_dir_all(&dir_path).unwrap();
+            }
+
+            // TODO: reduce memory by replacing this with an impl that writes the files immediately after reading them from the archive
+            // instead of reading each file entirely into memory (while the archive is also entirely in memory) before writing them
+            for file in pkg.files().unwrap() {
+                let file = file.unwrap();
+                let file_path = dest.join(
+                    file.metadata
+                        .path
+                        .strip_prefix("/")
+                        .unwrap_or(dest.as_ref()),
+                );
+
+                match file.metadata.mode {
+                    FileMode::Dir { .. } => {
+                        fs::create_dir_all(&file_path).unwrap();
+
+                        let perms =
+                            fs::Permissions::from_mode(file.metadata.mode.permissions().into());
+                        fs::set_permissions(&file_path, perms).unwrap();
+                    }
+                    FileMode::Regular { .. } => {
+                        let mut f = fs::File::create(&file_path).unwrap();
+                        f.write_all(&file.content).unwrap();
+
+                        let perms =
+                            fs::Permissions::from_mode(file.metadata.mode.permissions().into());
+                        f.set_permissions(perms).unwrap();
+                    }
+                    FileMode::SymbolicLink { .. } => {
+                        // broken symlinks (common for debuginfo handling) are perceived as not existing by "exists()"
+                        if file_path.exists() || file_path.symlink_metadata().is_ok() {
+                            fs::remove_file(&file_path).unwrap();
+                        }
+
+                        symlink(file.metadata.linkto, &file_path).unwrap();
+                    }
+                    _ => unreachable!("Encountered an unknown or invalid FileMode"),
                 }
             }
         }

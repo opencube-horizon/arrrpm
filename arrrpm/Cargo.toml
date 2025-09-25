@@ -12,4 +12,4 @@ indent = "0.1.1"
 petgraph = { version = "0.6.4", default-features = false }
 phf = { version = "0.11.2", features = ["macros"] }
 regex = "1.10.2"
-rpm = "0.13.1"
+rpm = "0.18.2"
