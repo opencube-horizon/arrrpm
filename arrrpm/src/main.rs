@@ -240,10 +240,14 @@ fn main() {
             };
 
             println!("Name: {}", pkg.get_name().unwrap_or(""));
-            println!("Summary: {}", pkg.get_summary().unwrap_or(""));
+            println!("Epoch: {}", pkg.get_epoch().unwrap_or(0));
             println!("Version: {}", pkg.get_version().unwrap_or(""));
+            println!("Release: {}", pkg.get_release().unwrap_or(""));
+            println!("Arch: {}", pkg.get_arch().unwrap_or(""));
+            println!("Summary: {}", pkg.get_summary().unwrap_or(""));
             println!("Vendor: {}", pkg.get_vendor().unwrap_or(""));
             println!("Packager: {}", pkg.get_packager().unwrap_or(""));
+            println!("License: {}", pkg.get_license().unwrap_or(""));
 
             println!(
                 "Description: |\n{}",
