@@ -8,6 +8,7 @@ license = "MIT"
 
 [dependencies]
 argh = "0.1.12"
+glob = "0.3.1"
 indent = "0.1.1"
 petgraph = { version = "0.6.4", default-features = false }
 phf = { version = "0.11.2", features = ["macros"] }

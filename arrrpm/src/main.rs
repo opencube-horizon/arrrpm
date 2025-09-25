@@ -1,4 +1,5 @@
 use argh::FromArgs;
+use glob::Pattern;
 use indent::indent_all_by;
 use petgraph::dot::{Config, Dot};
 use petgraph::graph::Graph;
@@ -6,7 +7,7 @@ use phf::phf_map;
 use regex::RegexSet;
 use rpm::{FileMode, Package, PackageMetadata};
 use std::os::unix::fs::PermissionsExt;
-use std::{collections::BTreeMap, env, fs, io::Write, os::unix::fs::symlink, path::Path};
+use std::{collections::BTreeMap, env, fs, io::Write, os::unix::fs::symlink, path::PathBuf};
 
 #[derive(FromArgs)]
 /// Some RPM tools
@@ -76,6 +77,22 @@ struct SubcommandExtract {
     /// RPM
     #[argh(positional)]
     rpm: String,
+
+    /// be verbose
+    #[argh(switch, short = 'v')]
+    verbose: bool,
+
+    /// change to directory before extracting
+    #[argh(option, short = 'C')]
+    directory: Option<String>,
+
+    /// strip NUM leading components from file names on extraction
+    #[argh(option)]
+    strip_components: Option<usize>,
+
+    /// exclude files, given as a glob pattern
+    #[argh(option)]
+    exclude: Vec<String>,
 }
 
 type ScriptletMethod = fn(&PackageMetadata) -> Result<rpm::Scriptlet, rpm::Error>;
@@ -317,6 +334,12 @@ fn main() {
             }
         }
         ArrrpmSubcommands::Extract(cmd) => {
+            let exclude_patterns: Vec<Pattern> = cmd
+                .exclude
+                .iter()
+                .map(|p| Pattern::new(p).unwrap())
+                .collect();
+
             let pkg = match Package::open(&cmd.rpm) {
                 Ok(pkg) => pkg,
                 Err(error) => {
@@ -324,38 +347,45 @@ fn main() {
                 }
             };
 
-            // Much of the below was lifted from the extract routine in the RPM crate,
-            // to be able to implement the --strip-components functionality
+            if let Some(dir) = &cmd.directory {
+                env::set_current_dir(dir).unwrap();
+            }
 
-            let dirs = match pkg
-                .metadata
-                .header
-                .get_entry_data_as_string_array(IndexTag::RPMTAG_DIRNAMES)
-            {
-                Ok(dirs) => dirs,
-                Err(error) => {
-                    panic!("Getting list of directories failed: {:#?}", error);
-                }
-            };
+            let strip_components = cmd.strip_components.unwrap_or(0);
 
             let dest = env::current_dir().unwrap();
-
-            // pull every base directory name in the package and create the directory in advance
-            for dir in dirs {
-                let dir_path = dest.join(Path::new(dir).strip_prefix("/").unwrap_or(dest.as_ref()));
-                fs::create_dir_all(&dir_path).unwrap();
-            }
 
             // TODO: reduce memory by replacing this with an impl that writes the files immediately after reading them from the archive
             // instead of reading each file entirely into memory (while the archive is also entirely in memory) before writing them
             for file in pkg.files().unwrap() {
                 let file = file.unwrap();
-                let file_path = dest.join(
-                    file.metadata
-                        .path
-                        .strip_prefix("/")
-                        .unwrap_or(dest.as_ref()),
-                );
+
+                let original_path = file.metadata.path.strip_prefix("/").unwrap();
+                if exclude_patterns
+                    .iter()
+                    .any(|p| p.matches_path(original_path))
+                {
+                    continue;
+                }
+
+                let mut stripped_path_components =
+                    original_path.components().skip(strip_components).peekable();
+
+                if stripped_path_components.peek().is_none() {
+                    continue;
+                }
+
+                let file_path = dest.join(stripped_path_components.collect::<PathBuf>());
+
+                if cmd.verbose {
+                    println!("{}", file_path.display());
+                }
+
+                if let Some(parent) = file_path.parent() {
+                    if !parent.exists() {
+                        fs::create_dir_all(parent).unwrap();
+                    }
+                }
 
                 match file.metadata.mode {
                     FileMode::Dir { .. } => {
