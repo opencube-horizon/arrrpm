@@ -3,46 +3,28 @@
 Simple standalone and portable binary to inspect given RPMs, generate a dependency tree in DOT format.
 
 ```console
-$ ./arrrpm help
-Usage: arrrpm <command> [<args>]
-
+$ arrrpm help
 Some RPM tools
 
-Options:
-  --help            display usage information
+Usage: arrrpm <COMMAND>
 
 Commands:
-  dep-tree          Generate a dot graph with dependencies from a set of RPMs
-  ls                List files in the given RPM
-
-$ ./arrrpm help dep-tree
-Usage: arrrpm dep-tree [<rpms...>] [-x <exclude...>]
-
-Generate a dot graph with dependencies from a set of RPMs
-
-Positional Arguments:
-  rpms              list of RPMs
+  dep-tree  Generate a dot graph with dependencies from a set of RPMs
+  ls        List files in the given RPM(s)
+  info      List info for the given RPM
+  cat       Cat content from the RPM (mainly scriptlets)
+  extract   Extract files from the RPM
+  help      Print this message or the help of the given subcommand(s)
 
 Options:
-  -x, --exclude     pattern for names to exclude
-  --help            display usage information
-
-$ ./arrrpm help ls
-Usage: arrrpm ls <rpm>
-
-List files in the given RPM
-
-Positional Arguments:
-  rpm               RPM
-
-Options:
-  --help            display usage information
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 Example usage when using a terminal (`wezterm`) which can display images inline:
 
 ```console
-$ ./arrrpm dep-tree \
+$ arrrpm dep-tree \
   -x '^(grep|coreutils|suse-kernel-rpm-scriptlets|python-rpm-macros)$' \
   ~/Downloads/some-archive/*.rpm | dot -Tjpg -Grankdir=LR | wezterm imgcat
 ```
