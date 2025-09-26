@@ -1,4 +1,4 @@
-use argh::FromArgs;
+use clap::{Parser, Subcommand};
 use glob::Pattern;
 use indent::indent_all_by;
 use petgraph::dot::{Config, Dot};
@@ -9,89 +9,79 @@ use rpm::{FileMode, Package, PackageMetadata};
 use std::os::unix::fs::PermissionsExt;
 use std::{collections::BTreeMap, env, fs, io::Write, os::unix::fs::symlink, path::PathBuf};
 
-#[derive(FromArgs)]
-/// Some RPM tools
+#[derive(Parser)]
+#[command(version, about = "Some RPM tools", long_about = None)]
 struct Arrrpm {
-    #[argh(subcommand)]
+    #[command(subcommand)]
     subcommand: ArrrpmSubcommands,
 }
 
-#[derive(FromArgs)]
-#[argh(subcommand)]
+#[derive(Subcommand)]
 enum ArrrpmSubcommands {
+    /// Generate a dot graph with dependencies from a set of RPMs
+    #[command(name = "dep-tree")]
     DepTree(SubcommandDepTree),
+    /// List files in the given RPM(s)
     Ls(SubcommandLs),
+    /// List info for the given RPM
     Info(SubcommandInfo),
+    /// Cat content from the RPM (mainly scriptlets)
     Cat(SubcommandCat),
+    /// Extract files from the RPM
     Extract(SubcommandExtract),
 }
 
-#[derive(FromArgs)]
-/// Generate a dot graph with dependencies from a set of RPMs
-#[argh(subcommand, name = "dep-tree")]
+#[derive(Parser)]
 struct SubcommandDepTree {
     /// pattern for names to exclude
-    #[argh(option, short = 'x')]
+    #[arg(short = 'x', long)]
     exclude: Vec<String>,
 
     /// list of RPMs
-    #[argh(positional)]
     rpms: Vec<String>,
 }
 
-#[derive(FromArgs)]
-/// List files in the given RPM(s)
-#[argh(subcommand, name = "ls")]
+#[derive(Parser)]
 struct SubcommandLs {
     /// list of RPMs
-    #[argh(positional)]
     rpms: Vec<String>,
 }
 
-#[derive(FromArgs)]
-/// List info for the given RPM
-#[argh(subcommand, name = "info")]
+#[derive(Parser)]
 struct SubcommandInfo {
     /// RPM
-    #[argh(positional)]
     rpm: String,
 }
 
-#[derive(FromArgs)]
-/// Cat content from the RPM (mainly scriptlets)
-#[argh(subcommand, name = "cat")]
+#[derive(Parser)]
 struct SubcommandCat {
     /// RPM
-    #[argh(positional)]
     rpm: String,
 
     /// scriptlets to output (default: all, can be: {{pre,post}}_{{install,uninstall,trans,untrans}})
-    #[argh(option, short = 's')]
+    #[arg(short = 's', long)]
     scriptlets: Vec<String>,
 }
 
-#[derive(FromArgs)]
-/// Extract files from the RPM
-#[argh(subcommand, name = "extract")]
+#[derive(Parser)]
 struct SubcommandExtract {
     /// RPM
-    #[argh(positional)]
     rpm: String,
 
     /// be verbose
-    #[argh(switch, short = 'v')]
+    #[arg(short, long, action = clap::ArgAction::SetTrue)]
     verbose: bool,
 
     /// change to directory before extracting
-    #[argh(option, short = 'C')]
+    #[arg(short = 'C', long)]
     directory: Option<String>,
 
     /// strip NUM leading components from file names on extraction
-    #[argh(option)]
+    #[arg(long)]
     strip_components: Option<usize>,
 
     /// exclude files, given as a glob pattern
-    #[argh(option)]
+    #[arg(long)]
     exclude: Vec<String>,
 }
 
@@ -108,7 +98,7 @@ static SCRIPTLET_METHODS: phf::Map<&'static str, ScriptletMethod> = phf_map! {
 };
 
 fn main() {
-    let arrrpm: Arrrpm = argh::from_env();
+    let arrrpm = Arrrpm::parse();
 
     match arrrpm.subcommand {
         ArrrpmSubcommands::DepTree(cmd) => {

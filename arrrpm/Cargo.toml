@@ -7,7 +7,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-argh = "0.1.12"
+clap = { version = "4.5.4", features = ["derive"] }
 glob = "0.3.1"
 indent = "0.1.1"
 petgraph = { version = "0.6.4", default-features = false }
