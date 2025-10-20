@@ -350,7 +350,7 @@ fn main() {
             for file in pkg.files().unwrap() {
                 let file = file.unwrap();
 
-                let original_path = file.metadata.path.strip_prefix("/").unwrap();
+                let original_path = file.metadata.path.strip_prefix("/").unwrap_or(&file.metadata.path);
                 if exclude_patterns
                     .iter()
                     .any(|p| p.matches_path(original_path))
