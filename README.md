@@ -21,12 +21,12 @@ Options:
   -V, --version  Print version
 ```
 
-Example usage when using a terminal (`wezterm`) which can display images inline:
+Example usage when using a terminal which can display images inline (e.g. ghostty, kitty, wezterm):
 
 ```console
 $ arrrpm dep-tree \
   -x '^(grep|coreutils|suse-kernel-rpm-scriptlets|python-rpm-macros)$' \
-  ~/Downloads/some-archive/*.rpm | dot -Tjpg -Grankdir=LR | wezterm imgcat
+  *.rpm | dot -Tpng -Grankdir=LR | chafa -f kitty --fit-width -
 ```
 
 ## Why Arrrpm?
