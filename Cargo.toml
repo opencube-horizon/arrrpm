@@ -7,10 +7,10 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.5.4", features = ["derive"] }
-glob = "0.3.1"
+clap = { version = "4.6.1", features = ["derive"] }
+glob = "0.3.3"
 indent = "0.1.1"
-petgraph = { version = "0.6.4", default-features = false }
-phf = { version = "0.11.2", features = ["macros"] }
-regex = "1.10.2"
-rpm = "0.18.2"
+petgraph = { version = "0.8.3", default-features = false }
+phf = { version = "0.14.0", features = ["macros"] }
+regex = "1.13.0"
+rpm = "0.25.1"

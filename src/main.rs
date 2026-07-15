@@ -5,7 +5,7 @@ use petgraph::dot::{Config, Dot};
 use petgraph::graph::Graph;
 use phf::phf_map;
 use regex::RegexSet;
-use rpm::{FileMode, Package, PackageMetadata};
+use rpm::{FileType, Package, PackageMetadata};
 use std::os::unix::fs::PermissionsExt;
 use std::{collections::BTreeMap, env, fs, io::Write, os::unix::fs::symlink, path::PathBuf};
 
@@ -227,23 +227,19 @@ fn main() {
                 let indent = if cmd.rpms.len() > 1 { "  - " } else { "" };
 
                 for fentry in fentries.iter() {
-                    match fentry.mode {
-                        FileMode::Dir { permissions: _ } => {
-                            println!("{}{}", indent, fentry.path.display());
+                    match fentry.mode().file_type() {
+                        FileType::Dir => {
+                            println!("{}{}", indent, fentry.path().display());
                         }
-                        FileMode::Regular { permissions: _ } => {
-                            println!("{}{}", indent, fentry.path.display());
+                        FileType::Regular => {
+                            println!("{}{}", indent, fentry.path().display());
                         }
-                        FileMode::SymbolicLink { permissions: _ } => {
-                            println!("{}{} -> {}", indent, fentry.path.display(), fentry.linkto);
+                        FileType::SymbolicLink => {
+                            println!("{}{} -> {}", indent, fentry.path().display(), fentry.linkto().unwrap_or(""));
                         }
-                        FileMode::Invalid {
-                            raw_mode: _,
-                            reason,
-                        } => {
-                            eprintln!("Invalid file entry for: {:?}: {}", fentry.path, reason);
+                        _ => {
+                            eprintln!("Invalid file entry for: {:?}", fentry.path());
                         }
-                        _ => todo!(),
                     }
                 }
             }
@@ -350,7 +346,8 @@ fn main() {
             for file in pkg.files().unwrap() {
                 let file = file.unwrap();
 
-                let original_path = file.metadata.path.strip_prefix("/").unwrap_or(&file.metadata.path);
+                let original_path = file.metadata.path();
+                let original_path = original_path.strip_prefix("/").unwrap_or(&original_path);
                 if exclude_patterns
                     .iter()
                     .any(|p| p.matches_path(original_path))
@@ -377,29 +374,29 @@ fn main() {
                     }
                 }
 
-                match file.metadata.mode {
-                    FileMode::Dir { .. } => {
+                match file.metadata.mode().file_type() {
+                    FileType::Dir => {
                         fs::create_dir_all(&file_path).unwrap();
 
                         let perms =
-                            fs::Permissions::from_mode(file.metadata.mode.permissions().into());
+                            fs::Permissions::from_mode(file.metadata.mode().permissions().into());
                         fs::set_permissions(&file_path, perms).unwrap();
                     }
-                    FileMode::Regular { .. } => {
+                    FileType::Regular => {
                         let mut f = fs::File::create(&file_path).unwrap();
                         f.write_all(&file.content).unwrap();
 
                         let perms =
-                            fs::Permissions::from_mode(file.metadata.mode.permissions().into());
+                            fs::Permissions::from_mode(file.metadata.mode().permissions().into());
                         f.set_permissions(perms).unwrap();
                     }
-                    FileMode::SymbolicLink { .. } => {
+                    FileType::SymbolicLink => {
                         // broken symlinks (common for debuginfo handling) are perceived as not existing by "exists()"
                         if file_path.exists() || file_path.symlink_metadata().is_ok() {
                             fs::remove_file(&file_path).unwrap();
                         }
 
-                        symlink(file.metadata.linkto, &file_path).unwrap();
+                        symlink(file.metadata.linkto().unwrap_or(""), &file_path).unwrap();
                     }
                     _ => unreachable!("Encountered an unknown or invalid FileMode"),
                 }

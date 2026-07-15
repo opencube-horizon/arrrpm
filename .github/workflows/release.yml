@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+            runner: ubuntu-24.04
+            artifact: arrrpm-x86_64-linux
+          - target: aarch64-unknown-linux-musl
+            runner: ubuntu-24.04-arm
+            artifact: arrrpm-arm64-linux
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Install Rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        target: ${{ matrix.target }}
+
+    - name: Install musl tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y musl-tools
+
+    - name: Build release
+      run: cargo build --release --target ${{ matrix.target }}
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ matrix.artifact }}
+        path: target/${{ matrix.target }}/release/arrrpm
+
+  release:
+    name: Create release
+    needs: build
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/download-artifact@v8
+      with:
+        path: artifacts
+
+    - name: Prepare release files
+      run: |
+        mkdir release
+        mv artifacts/arrrpm-x86_64-linux/arrrpm release/arrrpm-x86_64-linux
+        mv artifacts/arrrpm-arm64-linux/arrrpm release/arrrpm-arm64-linux
+        chmod +x release/*
+
+    - name: Create GitHub Release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release create "${{ github.ref_name }}" release/* --generate-notes --repo "${{ github.repository }}"
